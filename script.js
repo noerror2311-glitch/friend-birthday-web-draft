@@ -95,34 +95,78 @@ function buildSlide1() {
   return el;
 }
 
+/* ---------- heart layout: places N photos along a heart outline ---------- */
+function heartPositions(n) {
+  const pt = (t) => [
+    16 * Math.pow(Math.sin(t), 3),
+    13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+  ];
+  // walk the curve starting at the bottom tip, so the dip between the lobes falls in a gap
+  const M = 2000, pts = [], len = [0];
+  for (let i = 0; i <= M; i++) pts.push(pt(Math.PI + (2 * Math.PI * i) / M));
+  for (let i = 1; i <= M; i++) {
+    len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  const perimeter = len[M];
+  const k = (0.95 * perimeter) / (32 * n);
+  const size = Math.min(34, (100 * k) / (1 + k));      // tile width in % of the stage
+  const padX = size / 2;
+  const padY = (size / 2) * (32 / 29);                  // stage is 32:29, tiles are square
+  const out = [];
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const target = (perimeter * i) / n;
+    while (j < M && len[j] < target) j++;
+    const [x, y] = pts[j];
+    out.push({
+      left: padX + ((x + 16) / 32) * (100 - 2 * padX),
+      top: padY + ((11.93 - y) / 28.93) * (100 - 2 * padY)
+    });
+  }
+  return { size, tiles: out };
+}
+
 function buildMediaSlide({ page, title, sub, kind, files, count }) {
   const el = document.createElement('div');
-  const grid = document.createElement('div');
-  grid.className = 'media-grid';
-
   const total = (files && files.length) ? files.length : count;
-  let tiles = '';
-  for (let i = 0; i < total; i++) {
-    const src = (files && files[i]) ? files[i] : null;
-    let inner;
-    if (src) {
-      inner = kind === 'video'
-        ? `<video controls src="${src}"></video>`
-        : `<img src="${src}" alt="">`;
-    } else {
-      inner = kind === 'video'
-        ? '<!-- Add a video that plays right here on the page, e.g. <video controls src="images/clip1.mp4"></video> -->'
-        : '<!-- Add a photo here, e.g. <img src="images/photo1.jpg" alt=""> -->';
-    }
-    tiles += `<div class="media-tile" data-kind="${kind}">${inner}</div>`;
-  }
+
   el.innerHTML = `
     <span class="kicker">PAGE ${page} OF ${PAGE_TOTAL}</span>
     <h2 class="slide-title">${title}</h2>
     <p class="slide-sub">${sub}</p>
   `;
-  grid.innerHTML = tiles;
-  el.appendChild(grid);
+
+  if (kind === 'photo') {
+    // photos arranged in the shape of a heart
+    const { size, tiles: spots } = heartPositions(total);
+    const stage = document.createElement('div');
+    stage.className = 'photo-heart';
+    let html = '<div class="heart-core" aria-hidden="true">💖</div>';
+    for (let i = 0; i < total; i++) {
+      const src = (files && files[i]) ? files[i] : null;
+      const inner = src
+        ? `<img src="${src}" alt="">`
+        : '<span class="heart-ph">📷</span>';
+      const tilt = (i % 2 ? 1 : -1) * (2 + (i % 3));
+      html += `<div class="heart-tile" style="left:${spots[i].left.toFixed(2)}%;top:${spots[i].top.toFixed(2)}%;width:${size.toFixed(2)}%;--r:${tilt}deg;--i:${i}">${inner}</div>`;
+    }
+    stage.innerHTML = html;
+    el.appendChild(stage);
+  } else {
+    const grid = document.createElement('div');
+    grid.className = 'media-grid';
+    let tiles = '';
+    for (let i = 0; i < total; i++) {
+      const src = (files && files[i]) ? files[i] : null;
+      const inner = src
+        ? `<video controls src="${src}"></video>`
+        : '<!-- Add a video that plays right here on the page, e.g. <video controls src="images/clip1.mp4"></video> -->';
+      tiles += `<div class="media-tile" data-kind="${kind}">${inner}</div>`;
+    }
+    grid.innerHTML = tiles;
+    el.appendChild(grid);
+  }
+
   const continueRow = document.createElement('div');
   continueRow.className = 'cta-row';
   continueRow.style.marginTop = '26px';
@@ -424,7 +468,7 @@ function openGiftSequence() {
   setTimeout(() => {
     spawnParticles(field, {
       count: 30,
-      colors: ['#FF4136', '#FF9B90', '#F7E9DD', '#FFB6C9', '#FF2D2D'],
+      colors: ['#ff6b9d', '#ff3d7f', '#ffb3cd', '#ffd166', '#e8467f'],
       xRange: [30, 70],
       yStart: '30%',
       spreadX: 120,
@@ -486,7 +530,7 @@ function startCakeCut() {
     cakeBody.classList.add('squish');
     spawnParticles(field, {
       count: 14,
-      colors: ['#F7E9DD', '#FF9B90', '#5A2E2E'],
+      colors: ['#ffb3cd', '#ff6b9d', '#e8467f'],
       shapes: ['crumb'],
       xRange: [55, 65],
       yStart: '55%',
@@ -524,7 +568,7 @@ function spawnBalloon(field) {
     balloon.style.marginLeft = (-size / 2) + 'px';
     balloon.style.animationDelay = delay + 'ms';
     balloon.style.setProperty('--balloon-drift', drift + 'px');
-    balloon.style.background = `radial-gradient(circle at 32% 28%, var(--cream), ${colors[Math.floor(Math.random() * colors.length)]} 70%)`;
+    balloon.style.background = `radial-gradient(circle at 32% 28%, #fff, ${colors[Math.floor(Math.random() * colors.length)]} 70%)`;
     balloon.innerHTML = '<span class="balloon-string"></span>';
     field.appendChild(balloon);
     setTimeout(() => balloon.remove(), delay + BALLOON_RISE_MS + 150);
